@@ -1,8 +1,8 @@
 import os
-import json
 import joblib
 import py_vncorenlp
 import re
+import string
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -36,7 +36,9 @@ class TF_IDF_LegalDocumentRetriever:
         cleaned = " ".join(segmented)
         cleaned = re.sub(self.pattern, "", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        return cleaned
+        query_word = [token for token in cleaned.split() if token not in string.punctuation]
+        clean_query = ' '.join(query_word)
+        return clean_query
     
     def _encode_query(self, cleaned_query: str):
         query_vec = self.vectorizer.transform([cleaned_query])
@@ -47,13 +49,13 @@ class TF_IDF_LegalDocumentRetriever:
         vectored_query = self._encode_query(cleaned_query)
         return vectored_query
     
-    def search(self, query: str, limit: int = 3):
+    def search(self, query: str, limit: int = 10):
         query_vector = self.process_query(query)
         
         hits = self.qdrant_client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            limit=3,
+            limit=10,
             with_payload=True,
             with_vectors=False
         ) 
