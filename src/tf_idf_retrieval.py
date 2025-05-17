@@ -4,7 +4,6 @@ import py_vncorenlp
 import re
 import string
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize
 
@@ -31,31 +30,28 @@ class TF_IDF_LegalDocumentRetriever:
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
         self.collection_name = collection_name
     
-    def _preprocess_query(self, query: str) -> str:
+    def clean_query(self, query: str) -> str:
         segmented = self.vncore_model.word_segment(query)
         cleaned = " ".join(segmented)
         cleaned = re.sub(self.pattern, "", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         query_word = [token for token in cleaned.split() if token not in string.punctuation]
-        clean_query = ' '.join(query_word)
-        return clean_query
+        cleaned_query = ' '.join(query_word)
+        return cleaned_query
     
-    def _encode_query(self, cleaned_query: str):
+    def vectorize_process_query(self, query: str):
+        cleaned_query = self.clean_query(query)
         query_vec = self.vectorizer.transform([cleaned_query])
-        return normalize(query_vec).toarray()[0]
-    
-    def process_query(self, query: str):
-        cleaned_query = self._preprocess_query(query)
-        vectored_query = self._encode_query(cleaned_query)
+        vectored_query = normalize(query_vec).toarray()[0]
         return vectored_query
     
     def search(self, query: str, limit: int = 10):
-        query_vector = self.process_query(query)
+        query_vector = self.vectorize_process_query(query)
         
         hits = self.qdrant_client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            limit=10,
+            limit=limit,
             with_payload=True,
             with_vectors=False
         ) 
