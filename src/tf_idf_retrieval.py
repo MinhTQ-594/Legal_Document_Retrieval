@@ -1,11 +1,11 @@
 import os
 import joblib
-import py_vncorenlp
 import re
 import string
+import jpype
 from qdrant_client import QdrantClient
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize
+from vncorenlp_singleton import get_vncore_model
 
 class TF_IDF_LegalDocumentRetriever:
     def __init__(self,
@@ -15,9 +15,7 @@ class TF_IDF_LegalDocumentRetriever:
                  qdrant_host: str = "localhost",
                  qdrant_port: int = 6333,
                  collection_name: str = "tfidf_search_Law_document_retrivial"):
-        # Load VnCoreNLP
-        self.vncore_model = py_vncorenlp.VnCoreNLP(save_dir=model_dir)
-
+        self.vncore_model = get_vncore_model(model_dir=model_dir)
         ## Initial the segmentation model and the pattern to remove the stop word
         with open(os.path.join(dataset_dir, "stopwords_processed.txt"), "r", encoding="utf-8") as f:
             stopwords_list = list(map(str.strip, f))
@@ -27,7 +25,7 @@ class TF_IDF_LegalDocumentRetriever:
         self.vectorizer = joblib.load(os.path.join(vectorizer_path, 'tfidf_vectorizer.pkl'))
 
         # Connect to Qdrant
-        self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
+        self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=60.0)
         self.collection_name = collection_name
     
     def clean_query(self, query: str) -> str:
@@ -61,6 +59,13 @@ class TF_IDF_LegalDocumentRetriever:
         for hit in hits.points:
             print(f"Score: {hit.score:.4f} | law_id: {hit.payload['law_id']} | article_id: {hit.payload['article_id']}")
 
+    def top_n_answer(self, query, n):
+        answers = []
+        hits = self.search(query, n)
+        for hit in hits.points:
+            answers.append({"law_id": hit.payload['law_id'], "article_id": hit.payload['article_id']})
+        
+        return answers
 
 if __name__ == "__main__":
     current_dir = os.getcwd()

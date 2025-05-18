@@ -72,7 +72,13 @@ class TF_IDF_BM25SEARCH(TF_IDF_LegalDocumentRetriever):
         for result in final_results:
             print(f"Score: {result['score']} | law_id : {result['payload']['law_id']} | article_id : {result['payload']['article_id']}")
         
-    
+    def top_n_answer(self, query, n):
+        answers = []
+        hits = self.search(query, n)
+        for hit in hits:
+            answers.append({"law_id": hit['payload']['law_id'], "article_id": hit['payload']['article_id']})
+        
+        return answers
 if __name__ == "__main__":
     current_dir = os.getcwd()
     PROJECT_DIR = os.path.dirname(current_dir)
