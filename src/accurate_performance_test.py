@@ -5,6 +5,7 @@ from phoBert_sentenceTransformer import PhoBERT_SENTENCE_TRANSFORMER
 from tf_idf_retrieval import TF_IDF_LegalDocumentRetriever
 from tf_idf_BM25search_retrieval import TF_IDF_BM25SEARCH
 from tf_idf_W2V import TF_IDF_W2V
+from tf_idf_Glove import TF_IDF_GLOVE
 
 CUR_DIR = os.getcwd()
 PROJECT_DIR = os.path.join(CUR_DIR, "..")
@@ -38,11 +39,18 @@ phobert = PhoBERT_SENTENCE_TRANSFORMER(model_dir=model_dir, vectorizer_path=vect
 tfidf_base = TF_IDF_LegalDocumentRetriever(model_dir=model_dir,dataset_dir=dataset_dir, vectorizer_path=vectorizer_path)
 bm25 = TF_IDF_BM25SEARCH(model_dir=model_dir,dataset_dir=dataset_dir, vectorizer_path=vectorizer_path)
 w2v = TF_IDF_W2V(model_dir=model_dir,dataset_dir=dataset_dir, vectorizer_path=vectorizer_path)
+glove = TF_IDF_GLOVE(model_dir=model_dir,dataset_dir=dataset_dir, vectorizer_path=vectorizer_path)
 
 phobert_score = get_accurate_score(phobert)
+print("phobert_score:", phobert_score)
 tfidf_base_score = get_accurate_score(tfidf_base)
+print("tfidf_base_score:", tfidf_base_score)
 bm25_score = get_accurate_score(bm25)
+print("bm25_score:", bm25_score)
 w2v_score = get_accurate_score(w2v)
+print("w2v_score:", w2v_score)
+glove_score = get_accurate_score(glove)
+print("glove_score:", glove_score)
 
-scores = {"phobert_score": phobert_score, "tfidf_base_score": tfidf_base_score, "bm25_score": bm25_score, "w2v_score": w2v_score}
+scores = {"phobert_score": phobert_score, "tfidf_base_score": tfidf_base_score, "bm25_score": bm25_score, "w2v_score": w2v_score, "glove_score": glove_score}
 print(scores)
