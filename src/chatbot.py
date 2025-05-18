@@ -16,7 +16,7 @@ from tf_idf_W2V import TF_IDF_W2V
 # --- Global Configurations ---
 # LLM Configuration
 LLM_MODEL_ID = "google/gemma-3-1b-it"
-HF_TOKEN = os.environ.get("HF_TOKEN", None) # Recommended: login via huggingface-cli
+HF_TOKEN = os.environ.get("HF_TOKEN", "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") # Recommended: login via huggingface-cli
 
 # Atlas SBERT Retriever Configuration
 ORIGINAL_EMBEDDING_MODEL_NAME = 'dangvantuan/vietnamese-embedding'
@@ -32,7 +32,8 @@ PROJECT_ROOT_GUESS = os.path.join(CUR_SCRIPT_DIR, "..")
 
 DATASET_DIR = os.path.join(PROJECT_ROOT_GUESS, "dataset")
 VECTORIZER_DIR = os.path.join(PROJECT_ROOT_GUESS, "vectorizer") # For models
-VNCORENLP_MODEL_DIR = os.environ.get("VNCORENLP_MODEL_DIR", os.path.join(PROJECT_ROOT_GUESS, "models", "vncorenlp")) 
+#VNCORENLP_MODEL_DIR = os.environ.get("VNCORENLP_MODEL_DIR", os.path.join(PROJECT_ROOT_GUESS, "models", "vncorenlp")) 
+VNCORENLP_MODEL_DIR = os.path.join(PROJECT_ROOT_GUESS, "VnCoreNLP")
 
 # Qdrant Configurations 
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
@@ -40,6 +41,7 @@ QDRANT_PORT = int(os.environ.get("QDRANT_PORT", 6333))
 PHOBERT_COLLECTION = "PhoBERT_Embedded_Law_Retrieval"
 TFIDF_COLLECTION = "tfidf_search_Law_document_retrivial"
 W2V_COLLECTION = "Word2Vec_Law_document_retrivial"
+GLOVE_COLLECTION = "Glove_Law_document_retrivial"
 
 # --- Global Dictionary for Retriever Instances ---
 RETRIEVERS = {}
@@ -193,6 +195,25 @@ def initialize_all_retrievers(original_sbert_instance=None):
             "description": "TF-IDF + Word2Vec with Qdrant"
         }
         print(f"SUCCESS: Initialized 'w2v_qdrant' retriever.")
+    except Exception as e:
+        print(f"FAILED to initialize TF-IDF+Word2Vec retriever: {e}")
+
+    # 6. TF-IDF + GloVe
+    try:
+        glove_retriever = TF_IDF_W2V(
+            model_dir=VNCORENLP_MODEL_DIR,
+            dataset_dir=DATASET_DIR,
+            vectorizer_path=VECTORIZER_DIR, 
+            qdrant_host=QDRANT_HOST,
+            qdrant_port=QDRANT_PORT,
+            collection_name=GLOVE_COLLECTION
+        )
+        RETRIEVERS['glove_qdrant'] = {
+            "instance": w2v_retriever,
+            "type": "QDRANT_W2V",
+            "description": "TF-IDF + Glove with Qdrant"
+        }
+        print(f"SUCCESS: Initialized 'glove_qdrant' retriever.")
     except Exception as e:
         print(f"FAILED to initialize TF-IDF+Word2Vec retriever: {e}")
 
