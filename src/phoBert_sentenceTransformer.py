@@ -1,14 +1,10 @@
 import os
-import json
+import jpype
 import torch
-import py_vncorenlp
-from sentence_transformers import SentenceTransformer, models
-from sentence_transformers import InputExample
-from torch.utils.data import DataLoader
-from sentence_transformers import losses
+from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance
 from sklearn.preprocessing import normalize
+from vncorenlp_singleton import get_vncore_model
 
 class PhoBERT_SENTENCE_TRANSFORMER:
     def __init__(self,
@@ -17,8 +13,8 @@ class PhoBERT_SENTENCE_TRANSFORMER:
                  qdrant_host: str = "localhost",
                  qdrant_port: int = 6333,
                  collection_name: str = "PhoBERT_Embedded_Law_Retrieval"):
-        self.vncore_model = py_vncorenlp.VnCoreNLP(save_dir=model_dir)
-        self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
+        self.vncore_model = get_vncore_model(model_dir=model_dir)
+        self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=60.0)
         self.collection_name = collection_name
         self.sentence_transformer = sentence_embedded_model = SentenceTransformer(os.path.join(vectorizer_path, "PhoBert"), device='cuda' if torch.cuda.is_available() else 'cpu' )
 
@@ -47,6 +43,15 @@ class PhoBERT_SENTENCE_TRANSFORMER:
     def print_results(self, hits):
         for hit in hits.points:
             print(f"Score: {hit.score:.4f} | law_id: {hit.payload['law_id']} | article_id: {hit.payload['article_id']}")
+
+
+    def top_n_answer(self, query, n):
+        answers = []
+        hits = self.search(query, n)
+        for hit in hits.points:
+            answers.append({"law_id": hit.payload['law_id'], "article_id": hit.payload['article_id']})
+        
+        return answers
 
 if __name__ == "__main__":
     current_dir = os.getcwd()
