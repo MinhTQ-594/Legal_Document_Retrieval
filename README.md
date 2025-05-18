@@ -11,3 +11,8 @@ Download corresponding .rar files and extract then put extracted folder into vec
 1. PhoBERT: https://drive.google.com/file/d/1slBlmvk8EXRc5UaYZ4FtMLYpOrcufMB9/view?usp=sharing
 2. W2V: https://drive.google.com/file/d/1SyVkOXzqiwlWkuZjMHCrEsGhMCPo5COS/view?usp=sharing
 3. Glove: https://drive.google.com/file/d/1UK5-ta6yMeP4Hy4nSv7TxYqIG4alNvNC/view?usp=sharing
+
+## UI
+
+The frontend folder contains a React application used for testing and interacting with retrieval results.
+The chatbot interface is powered by a separate Streamlit app located in the streamlit_ui directory.

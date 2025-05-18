@@ -1,0 +1,6 @@
+.venv
+vectorizer/PhoBert
+vectorizer/w2v
+__pycache__/
+test.py
+VnCoreNLP/
