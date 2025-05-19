@@ -18,7 +18,7 @@ from tf_idf_W2V import TF_IDF_W2V
 LLM_MODEL_ID = "google/gemma-3-1b-it"
 HF_TOKEN = os.environ.get("HF_TOKEN", "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") # Recommended: login via huggingface-cli
 
-# Atlas SBERT Retriever Configuration
+# Atlas pretrained_phobert Retriever Configuration
 ORIGINAL_EMBEDDING_MODEL_NAME = 'dangvantuan/vietnamese-embedding'
 ATLAS_SRV_STRING = os.environ.get("ATLAS_SRV_STRING", "mongodb+srv://username:02122004@rag-legal-cluster.gydcd6m.mongodb.net/?retryWrites=true&w=majority&appName=rag-legal-cluster") 
 ATLAS_DATABASE_NAME = "zalo_ai_legal_db"
@@ -45,6 +45,21 @@ GLOVE_COLLECTION = "Glove_Law_document_retrivial"
 
 # --- Global Dictionary for Retriever Instances ---
 RETRIEVERS = {}
+
+# -------- data for back retrieval ---------------
+corpus_data_path = os.path.join(DATASET_DIR, "processed_legal_corpus.json")
+
+with open(corpus_data_path, "r", encoding="utf-8") as file:
+    corpus_data = json.load(file)
+
+# Build the index
+index = {
+    law["law_id"]: {
+        article["article_id"]: article
+        for article in law["articles"]
+    }
+    for law in corpus_data
+}
 
 # --- 1. Model Loading ---
 def load_llm_model():
@@ -84,44 +99,44 @@ def load_llm_model():
     
     return gemma_tokenizer, gemma_model, selected_device
 
-def load_original_sbert_model():
-    """Loads the original SBERT model for Atlas-based retrieval."""
-    sbert_model = None
+def load_original_pretrained_phobert_model():
+    """Loads the original pretrained_phobert model for Atlas-based retrieval."""
+    pretrained_phobert_model = None
     selected_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     try:
-        sbert_model = SentenceTransformer(ORIGINAL_EMBEDDING_MODEL_NAME, device=selected_device)
-        print(f"Successfully loaded original SBERT model '{ORIGINAL_EMBEDDING_MODEL_NAME}' on {selected_device}.")
+        pretrained_phobert_model = SentenceTransformer(ORIGINAL_EMBEDDING_MODEL_NAME, device=selected_device)
+        print(f"Successfully loaded original pretrained_phobert model '{ORIGINAL_EMBEDDING_MODEL_NAME}' on {selected_device}.")
 
-        hf_model_config_max_pos_embed = sbert_model[0].auto_model.config.max_position_embeddings
+        hf_model_config_max_pos_embed = pretrained_phobert_model[0].auto_model.config.max_position_embeddings
         compatible_max_seq_length = hf_model_config_max_pos_embed - 2 # Account for [CLS] and [SEP]
-        current_st_max_seq_length = sbert_model[0].max_seq_length
-        tokenizer_max_len = sbert_model.tokenizer.model_max_length
+        current_st_max_seq_length = pretrained_phobert_model[0].max_seq_length
+        tokenizer_max_len = pretrained_phobert_model.tokenizer.model_max_length
         final_max_seq_len = min(compatible_max_seq_length, tokenizer_max_len, current_st_max_seq_length)
 
         if current_st_max_seq_length != final_max_seq_len:
             print(f"Adjusting SentenceTransformer's max_seq_length from {current_st_max_seq_length} to {final_max_seq_len}.")
-            sbert_model[0].max_seq_length = final_max_seq_len
-        print(f"Effective max_seq_length for SBERT model: {sbert_model[0].max_seq_length}")
+            pretrained_phobert_model[0].max_seq_length = final_max_seq_len
+        print(f"Effective max_seq_length for pretrained_phobert model: {pretrained_phobert_model[0].max_seq_length}")
 
     except Exception as e:
-        print(f"Error loading original SBERT model '{ORIGINAL_EMBEDDING_MODEL_NAME}': {e}")
-    return sbert_model
+        print(f"Error loading original pretrained_phobert model '{ORIGINAL_EMBEDDING_MODEL_NAME}': {e}")
+    return pretrained_phobert_model
 
-def initialize_all_retrievers(original_sbert_instance=None):
+def initialize_all_retrievers(original_pretrained_phobert_instance=None):
     """Initializes all available retriever models and stores them in RETRIEVERS dict."""
     global RETRIEVERS
     print("\nInitializing retrievers...")
 
-    # 1. Original SBERT + Atlas
-    if original_sbert_instance:
-        RETRIEVERS['original_sbert_atlas'] = {
-            "instance": original_sbert_instance,
-            "type": "ATLAS_SBERT",
-            "description": "SBERT ('dangvantuan/vietnamese-embedding') with MongoDB Atlas Vector Search"
+    # 1. Original pretrained_phobert + Atlas
+    if original_pretrained_phobert_instance:
+        RETRIEVERS['original_pretrained_phobert_atlas'] = {
+            "instance": original_pretrained_phobert_instance,
+            "type": "ATLAS_pretrained_phobert",
+            "description": "pretrained_phobert ('dangvantuan/vietnamese-embedding') with MongoDB Atlas Vector Search"
         }
-        print(f"SUCCESS: Initialized 'original_sbert_atlas' retriever.")
+        print(f"SUCCESS: Initialized 'original_pretrained_phobert_atlas' retriever.")
     else:
-        print(f"INFO: Original SBERT model not loaded, 'original_sbert_atlas' retriever skipped.")
+        print(f"INFO: Original pretrained_phobert model not loaded, 'original_pretrained_phobert_atlas' retriever skipped.")
 
     # 2. PhoBERT Sentence Transformer 
     try:
@@ -223,10 +238,10 @@ def initialize_all_retrievers(original_sbert_instance=None):
         print(f"\nInitialized {len(RETRIEVERS)} retriever(s).")
 
 # --- 2. Core RAG Functions ---
-def embed_query_sbert(query_text: str, model: SentenceTransformer):
-    """Embeds query using the provided SBERT model (used by original Atlas retriever)."""
+def embed_query_pretrained_phobert(query_text: str, model: SentenceTransformer):
+    """Embeds query using the provided pretrained_phobert model (used by original Atlas retriever)."""
     if not model:
-        print("Error: SBERT Embedding model is not loaded for embed_query_sbert.")
+        print("Error: pretrained_phobert Embedding model is not loaded for embed_query_pretrained_phobert.")
         return None
     if not isinstance(query_text, str) or not query_text.strip():
         print("Error: Query text must be a non-empty string.")
@@ -235,10 +250,10 @@ def embed_query_sbert(query_text: str, model: SentenceTransformer):
         query_embedding = model.encode([query_text], convert_to_tensor=False, show_progress_bar=False)
         return query_embedding[0]
     except Exception as e:
-        print(f"Error embedding query with SBERT: {e}")
+        print(f"Error embedding query with pretrained_phobert: {e}")
         return None
 
-def search_atlas_sbert(query_embedding: np.ndarray, top_n: int = 3):
+def search_atlas_pretrained_phobert(query_embedding: np.ndarray, top_n: int = 3):
     """
     Searches MongoDB Atlas using $vectorSearch.
     """
@@ -311,19 +326,33 @@ def retrieve_documents_unified(query_text: str, retriever_key: str, top_n: int =
 
     print(f"\nUsing retriever: {retriever_config['description']} for query: \"{query_text[:50]}...\"")
 
+    # helper function to get article by IDs
+    def get_article_by_ids(law_id, article_id):
+        global index
+        article = index.get(law_id, {}).get(article_id)
+        if article:
+            return {
+                "title": article["title"],
+                "text": article["text"]
+            }
+        return None
+    
     try:
-        if retriever_type == "ATLAS_SBERT":
-            sbert_model = retriever_instance
-            query_embedding = embed_query_sbert(query_text, sbert_model)
+        if retriever_type == "ATLAS_pretrained_phobert":
+            pretrained_phobert_model = retriever_instance
+            query_embedding = embed_query_pretrained_phobert(query_text, pretrained_phobert_model)
             if query_embedding is None:
                 return []
-            atlas_raw_docs = search_atlas_sbert(query_embedding, top_n)
+            atlas_raw_docs = search_atlas_pretrained_phobert(query_embedding, top_n)
             for doc in atlas_raw_docs:
+                law_id = doc.get("law_id", "N/A")
+                articale_id = doc.get("article_id", "N/A")
+                article = get_article_by_ids(law_id, articale_id)
                 formatted_docs.append({
-                    "text": doc.get("text", ""),
-                    "title": doc.get("title", "N/A"),
-                    "law_id": doc.get("law_id", "N/A"),
-                    "article_id": doc.get("article_id", "N/A"),
+                    "text": article.get("text", "N/A") if article else doc.get("text", "N/A"),
+                    "title": article.get("title", "N/A") if article else doc.get("title", "N/A"),
+                    "law_id": law_id,
+                    "article_id": articale_id,
                     "score": doc.get("similarity_score", 0.0)
                 })
 
@@ -334,9 +363,12 @@ def retrieve_documents_unified(query_text: str, retriever_key: str, top_n: int =
             if retriever_type == "QDRANT_BM25":
                 for hit in raw_hits: 
                     payload = hit.get('payload', {})
+                    law_id = payload.get("law_id", "N/A")
+                    article_id = payload.get("article_id", "N/A")
+                    article = get_article_by_ids(law_id, article_id)
                     formatted_docs.append({
-                        "text": payload.get("text_content", payload.get("text", "N/A")),
-                        "title": payload.get("title", "N/A"),
+                        "text": article.get("text", "N/A") if article else payload.get("text", "N/A"),
+                        "title": article.get("title", "N/A") if article else payload.get("title", "N/A"),
                         "law_id": payload.get("law_id", "N/A"),
                         "article_id": payload.get("article_id", "N/A"),
                         "score": hit.get("score", 0.0)
@@ -345,9 +377,12 @@ def retrieve_documents_unified(query_text: str, retriever_key: str, top_n: int =
                 if hasattr(raw_hits, 'points'):
                     for hit_point in raw_hits.points:
                         payload = hit_point.payload if hit_point.payload else {}
+                        law_id = payload.get("law_id", "N/A")
+                        article_id = payload.get("article_id", "N/A")
+                        article = get_article_by_ids(law_id, article_id)
                         formatted_docs.append({
-                            "text": payload.get("text_content", payload.get("text", "N/A")),
-                            "title": payload.get("title", "N/A"),
+                            "text": article.get("text", "N/A") if article else payload.get("text", "N/A"),
+                            "title": article.get("title", "N/A") if article else payload.get("title", "N/A"),
                             "law_id": payload.get("law_id", "N/A"),
                             "article_id": payload.get("article_id", "N/A"),
                             "score": hit_point.score
@@ -490,21 +525,21 @@ if __name__ == '__main__':
     print("\n--- Bước 1: Tải mô hình Ngôn ngữ Lớn (LLM) ---")
     gemma_tokenizer, gemma_model, llm_device = load_llm_model()
 
-    original_sbert_model = None
+    original_pretrained_phobert_model = None
     if ATLAS_SRV_STRING and "username:password" not in ATLAS_SRV_STRING :
-        print("\n--- Bước 2: Tải mô hình SBERT (cho Atlas Retriever) ---")
-        original_sbert_model = load_original_sbert_model()
+        print("\n--- Bước 2: Tải mô hình pretrained_phobert (cho Atlas Retriever) ---")
+        original_pretrained_phobert_model = load_original_pretrained_phobert_model()
     else:
-        print("\n--- Bước 2: Bỏ qua tải mô hình SBERT (Atlas SRV không được cấu hình đúng) ---")
+        print("\n--- Bước 2: Bỏ qua tải mô hình pretrained_phobert (Atlas SRV không được cấu hình đúng) ---")
 
 
     print("\n--- Bước 3: Khởi tạo các mô hình Truy xuất (Retrievers) ---")
-    initialize_all_retrievers(original_sbert_instance=original_sbert_model)
+    initialize_all_retrievers(original_pretrained_phobert_instance=original_pretrained_phobert_model)
 
     if gemma_tokenizer and gemma_model and RETRIEVERS:
         print("\n--- Kiểm tra kết nối ban đầu (nếu có) ---")
-        if 'original_sbert_atlas' in RETRIEVERS:
-            print("Kiểm tra kết nối MongoDB Atlas cho retriever SBERT...")
+        if 'original_pretrained_phobert_atlas' in RETRIEVERS:
+            print("Kiểm tra kết nối MongoDB Atlas cho retriever pretrained_phobert...")
             try:
                 temp_client = pymongo.MongoClient(ATLAS_SRV_STRING, serverSelectionTimeoutMS=5000)
                 temp_client.admin.command('ping')
@@ -514,7 +549,7 @@ if __name__ == '__main__':
                 # doc_count = collection_check.count_documents({})
                 # print(f"Tìm thấy {doc_count} tài liệu trong bộ sưu tập '{ATLAS_COLLECTION_NAME}'.")
             except Exception as e:
-                print(f"Lỗi kết nối MongoDB Atlas: {e}. Retriever SBERT gốc có thể không hoạt động.")
+                print(f"Lỗi kết nối MongoDB Atlas: {e}. Retriever pretrained_phobert gốc có thể không hoạt động.")
             finally:
                 if 'temp_client' in locals() and temp_client:
                     temp_client.close()
